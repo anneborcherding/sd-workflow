@@ -41,7 +41,9 @@ showing the status header, changelog, ticked acceptance criteria, a descoped one
 
 - **`specs/INDEX.md`** — one table with every spec's status, version, folder, and the recommended build
   order, kept in lockstep with the specs themselves.
-- **Slash commands** — `/requirements`, `/technical-design`, `/write-tests`, `/frontend-architecture`.
+- **Workflow entry points** — slash commands (`/requirements`, `/technical-design`, `/write-tests`,
+  `/frontend-architecture`) and Codex CLI skills (`$requirements`, `$technical-design`,
+  `$write-tests`, `$frontend-architecture`).
 - **Reviewer agents** — `architecture-reviewer`, `security-reviewer`, driving the Plan Review Workflow.
   Pick a model per agent (any model your harness understands, including local ones) — see
   *Choosing models for the reviewer agents*.
@@ -64,7 +66,8 @@ MCP provider.
 
 ## Requirements
 
-- [APM](https://microsoft.github.io/apm/) installed (`apm --version`).
+- [APM](https://microsoft.github.io/apm/) installed (`apm --version`). Codex support requires
+  **APM 0.31.0+**; existing non-Codex installations retain their prior compatibility baseline.
 - `git` (for the enforcement floor).
 - `jq` — **required**. The project config (`.spec-workflow/config.json`) is JSON, and `jq` is what
   reads and writes it and merges agent hooks safely. The setup script checks for it up front and
@@ -83,9 +86,27 @@ reproducible and can't be silently moved under you:
 apm install mode41/sd-workflow#<commit-sha>
 ```
 
-This deploys the rules, commands, and reviewer agents to **whichever harness markers your repo has** —
-`.claude/`, `.opencode/`, `.cursor/`, `.github/`, … (auto-detected; nothing pinned). Verified:
-instructions → each harness's rules dir, commands → its commands dir, agents → its agents dir.
+This deploys the rules, commands/skills, and reviewer agents to **whichever harness markers your repo
+has** — `.claude/`, `.opencode/`, `.cursor/`, `.github/`, `.codex/`, … (auto-detected; nothing pinned).
+For Codex explicitly select the target if the project has no `.codex/` marker yet:
+
+```bash
+apm install mode41/sd-workflow#<commit-sha> --target codex
+```
+
+Codex receives five shared Agent Skills in `.agents/skills/` (four entry points plus the mandatory
+workflow-rules skill) and two reviewer agents in `.codex/agents/`.
+
+### Why Codex uses skills
+
+Skills are Codex's native, named unit for reusable task guidance. They let the workflow keep the
+four focused entry points discoverable and separately invocable, without making every ordinary
+Codex task carry the full requirements, design, and test playbooks. The shared
+`spec-driven-workflow` skill carries the rules that apply to every task; each entry-point skill
+carries the detailed procedure for that one phase.
+
+They are generated from the same commands and managed instructions used by the other harnesses, so
+Codex is an adaptation of the same workflow rather than a second, drifting copy to maintain.
 
 **2. Run the one-time setup** (idempotent; re-run after every `apm update`). Read it first if you
 like — it's short, does **no** network access, and shells out to nothing but `git` and `jq`:
@@ -118,7 +139,22 @@ refresh; your seeded living files are left untouched (a drift notice prints if y
 `docs/SECURITY-RULES.md` diverges from upstream), and `.spec-workflow/MANUAL-STEPS.md` is
 regenerated. In CI, use `apm install --frozen` and run `apm audit`.
 
-> **Verified against APM 0.25.0.** Auto-detect deploy works; a dependency's `lifecycle:` block is
+### Codex preservation contract
+
+Normal installation and update preserve locally authored `AGENTS.md`, `AGENTS.override.md`,
+`.codex/config.toml`, unrelated Codex hooks/settings, existing user skills and agents, and all
+seed-once workflow data. APM reports and skips an unmanaged primitive collision; the setup script
+fails closed on symlinked managed paths, ownership ambiguity, malformed TOML, or reviewer drift.
+`AGENTS.override.md` has higher Codex precedence than `AGENTS.md`, so an override can intentionally
+shadow the workflow section and is never edited automatically.
+
+Do not use `apm install --force` if you need this guarantee. `--force` is APM's explicit destructive
+authorization to overwrite locally authored collisions and is outside the package's preservation
+contract. Neither `apm.lock.yaml` nor `.spec-workflow/agent-model-state.json` is a cryptographic
+security boundary; they protect against collisions and ordinary drift in a consumer-writable repo.
+
+> **Codex verified against APM 0.31.0.** The prior non-Codex baseline was APM 0.25.0. Auto-detect
+> deploy works; a dependency's `lifecycle:` block is
 > project-scoped and does **not** auto-run in a consumer (hence the explicit step 2); project
 > lifecycle scripts are **untrusted by default** (`apm lifecycle trust` required) and executable
 > primitives are gated by `apm approve` — so nothing of ours runs without your explicit action.
@@ -131,8 +167,17 @@ In your coding agent, not the shell:
 /requirements a CLI that converts CSV files to Parquet
 ```
 
-That interviews you about the project, fills in `docs/PRD.md`, and splits the work into
-`specs/SPEC-N-name/` folders (each with a `spec.md`) with a recommended build order. Then, per spec:
+In Codex CLI, invoke the requirements skill with `$requirements` followed by the idea — in the
+Codex conversation, not in your shell:
+
+```text
+$requirements a CLI that converts CSV files to Parquet
+```
+
+Codex loads the skill, checks the project context, then interviews you about the project. For a new
+project it fills in `docs/PRD.md` and splits the work into `specs/SPEC-N-name/` folders (each with a
+`spec.md`) with a recommended build order. If the PRD already exists, the same invocation adds one
+well-scoped spec for the feature instead. Then, per spec:
 
 ```
 /technical-design SPEC-1     → design reviewed by both reviewer agents, written as tech-design.md
@@ -141,8 +186,20 @@ That interviews you about the project, fills in `docs/PRD.md`, and splits the wo
                              → tick the criteria, record the evidence in audit-trail.md, done
 ```
 
-Adding a feature to a project that already has a PRD? Same entry point — `/requirements <the feature>`
-adds a single spec instead of bootstrapping everything.
+| Existing command | Codex CLI skill |
+|---|---|
+| `/requirements <idea>` | `$requirements <idea>` |
+| `/technical-design SPEC-X` | `$technical-design SPEC-X` |
+| `/write-tests SPEC-X` | `$write-tests SPEC-X` |
+| `/frontend-architecture <change>` | `$frontend-architecture <change>` |
+
+Codex loads repository skills from `.agents/skills` and project agents from `.codex/agents`. The
+marked `AGENTS.md` workflow section requires Codex to read the shared `spec-driven-workflow` skill
+before any task, including tasks that do not explicitly invoke one of the four entry-point skills.
+See OpenAI's documentation for [skills](https://developers.openai.com/codex/skills/),
+[subagents](https://developers.openai.com/codex/subagents/), and
+[project instructions](https://developers.openai.com/codex/guides/agents-md/), plus APM's
+[multi-skill package layout](https://microsoft.github.io/apm/reference/package-types/).
 
 Not sure what you're aiming at? [`docs/example-spec.md`](docs/example-spec.md) is a complete spec at
 the end of that journey, annotated with which hook enforces which convention.
@@ -164,6 +221,7 @@ the end of that journey, annotated with which hook enforces which convention.
     design.md              #     design specifics (consumed by /frontend-architecture)
   MANUAL-STEPS.md          #   generated per-machine checklist of what the installer couldn't do
                            #   (git-ignored via a managed .spec-workflow/.gitignore — don't commit)
+  agent-model-state.json   #   managed, git-ignored: Codex model provenance (ordinary drift guard)
 specs/                     # your specs (SPEC-N-name/ folders) + INDEX.md   ← living data, seeded once
                            #   each folder: spec.md + tech-design.md + audit-trail.md + attachments
                            #   a parked spec may sit under specs/backlog/SPEC-N-name/ instead
@@ -172,7 +230,9 @@ docs/SECURITY-RULES.md     # living data, seeded once (default `security` source
 ARCHITECTURE.md            # optional — default `architecture` source (create as the project takes shape)
 AGENTS.md                  # neutral project memory, seeded once (or workflow section appended if it exists)
 spec-workflow.supplemental.md  # your workflow tuning, seeded once, never overwritten
-.claude/ .opencode/ ...    # APM-deployed rules/commands/agents + our agent-model stamps
+.agents/skills/            # APM-deployed skills; Codex entry points and shared workflow rules
+.codex/agents/             # APM-compiled Codex reviewer agents
+.claude/ .opencode/ ...    # other APM-deployed rules/commands/agents + our agent-model stamps
 ```
 
 ## Enforcement — what runs where
@@ -214,6 +274,7 @@ fixtures in a temp dir — nothing is installed and your repo is untouched:
 
 ```bash
 bash tests/enforcement.test.sh     # exit 0 = all passed
+bash tests/codex-support.test.sh   # Codex packaging, preservation, model, and APM integration
 ```
 
 It covers the status / AC / open-question state machine, the spec-versioning substantive-change rules
@@ -281,7 +342,7 @@ Two details worth knowing:
   "interaction": { "mode": "ask" },
   "agents": {
     "architecture-reviewer": { "model": { "default": "opus" } },
-    "security-reviewer":     { "model": { "claude": "sonnet", "opencode": "ollama/qwen2.5-coder" } }
+    "security-reviewer":     { "model": { "claude": "sonnet", "opencode": "ollama/qwen2.5-coder", "codex": "gpt-5.6" } }
   }
 }
 ```
@@ -296,9 +357,12 @@ Two details worth knowing:
   to change your answers, or edit the JSON directly (the `$schema` pointer gives you editor
   validation and completion).
 
-**Stamped today:** Claude Code (`.claude/agents/`) and opencode (`.opencode/agents/`). Copilot's
-`model:` is a list of UI display names and Codex agents are TOML without a model field, so those
-harnesses are reported as unsupported and their agents inherit the harness default.
+**Stamped today:** Claude Code (`.claude/agents/`), opencode (`.opencode/agents/`), and Codex CLI
+(`.codex/agents/`). Codex values are exact model IDs written as safe TOML strings. A versioned
+`.spec-workflow/agent-model-state.json` record permits idempotent updates and model changes while
+refusing to modify an agent that has drifted from its APM baseline or known package transformation.
+Copilot's `model:` is a list of UI display names, so it remains unsupported and inherits the harness
+default.
 
 **Why step 2 re-runs every time:** `apm update` overwrites the deployed agent files, so the setup
 command re-applies your models afterwards. That is also why your choices live in `config.json` rather

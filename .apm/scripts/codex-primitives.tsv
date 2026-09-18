@@ -1,0 +1,6 @@
+# skill<TAB>description<TAB>source-kind<TAB>source(s)
+requirements	Create or update testable product requirements and specs. Use for a new project or feature before technical design.	prompt	.apm/prompts/requirements.prompt.md
+technical-design	Create and review a concrete technical design for an existing spec. Use before implementing a planned feature.	prompt	.apm/prompts/technical-design.prompt.md
+write-tests	Write and run tests against a spec, then record acceptance and BDD evidence. Use after implementation.	prompt	.apm/prompts/write-tests.prompt.md
+frontend-architecture	Review frontend architecture for a non-trivial UI change. Use before implementing frontend structure or UX changes.	prompt	.apm/prompts/frontend-architecture.prompt.md
+spec-driven-workflow	Load the mandatory spec-driven workflow, engineering, testing, security, versioning, and review rules before working in this repository.	instructions	.apm/instructions/code-hygiene.instructions.md,.apm/instructions/engineering-practices.instructions.md,.apm/instructions/interaction-mode.instructions.md,.apm/instructions/plan-review-workflow.instructions.md,.apm/instructions/security.instructions.md,.apm/instructions/spec-driven-workflow.instructions.md,.apm/instructions/spec-versioning.instructions.md,.apm/instructions/testing.instructions.md

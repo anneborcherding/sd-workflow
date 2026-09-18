@@ -76,6 +76,10 @@
         "opencode": {
           "type": ["string", "null"],
           "description": "Model for opencode (.opencode/agents/), in provider/model form. Examples: \"anthropic/claude-opus-4-8\", \"ollama/qwen2.5-coder\", \"ollama/devstral\"."
+        },
+        "codex": {
+          "type": ["string", "null"],
+          "description": "Exact model ID for Codex CLI project agents (.codex/agents/*.toml). Omit or set null to inherit the parent/default model."
         }
       }
     }

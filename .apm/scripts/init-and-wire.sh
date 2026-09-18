@@ -29,6 +29,49 @@ ROOT="${APM_PROJECT_DIR:-$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null |
 # If we resolved to somewhere inside apm_modules, climb out to the real project root.
 case "$ROOT" in */apm_modules/*) ROOT="${ROOT%%/apm_modules/*}";; esac
 [ -n "$ROOT" ] && [ -d "$ROOT" ] || { echo "spec-driven-workflow: could not resolve project root; aborting." >&2; exit 1; }
+ROOT="$(cd "$ROOT" && pwd -P)" || { echo "spec-driven-workflow: could not canonicalize project root; aborting." >&2; exit 1; }
+
+# Fail closed before the first write. A repository can contain hostile symlinks; setup must never
+# follow them into another tree. Check every destination family this installer owns or seeds.
+reject_symlink_path() {
+  local rel="$1" cur="$ROOT" part oldifs="$IFS"
+  IFS='/'; for part in $rel; do
+    IFS="$oldifs"; [ -n "$part" ] || continue
+    cur="$cur/$part"
+    [ ! -L "$cur" ] || { echo "spec-driven-workflow: unsafe symlink destination: $rel" >&2; return 1; }
+    IFS='/'
+  done
+  IFS="$oldifs"
+}
+
+for managed in \
+  .spec-workflow .spec-workflow/hooks .spec-workflow/templates \
+  .spec-workflow/config.json .spec-workflow/context-map.md .spec-workflow/agent-model-state.json \
+  specs specs/INDEX.md docs docs/PRD.md docs/SECURITY-RULES.md \
+  AGENTS.md spec-workflow.supplemental.md \
+  .codex .codex/agents; do
+  reject_symlink_path "$managed" || exit 1
+done
+for managed_tree in "$ROOT/.spec-workflow/hooks" "$ROOT/.spec-workflow/templates"; do
+  if [ -d "$managed_tree" ] && find "$managed_tree" -type l -print -quit 2>/dev/null | grep -q .; then
+    echo "spec-driven-workflow: unsafe symlink in managed tree: $managed_tree" >&2
+    exit 1
+  fi
+done
+
+# Codex primitives and project agents used by this package require APM 0.31+. Detect the installed
+# reviewers (the post-install setup path) rather than treating any unrelated .codex directory as ours.
+if [ -e "$ROOT/.codex/agents/architecture-reviewer.toml" ] || [ -e "$ROOT/.codex/agents/security-reviewer.toml" ]; then
+  apm_version="$(apm --version 2>/dev/null | sed -n 's/.*version \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -1)"
+  case "$apm_version" in
+    '') echo "spec-driven-workflow: Codex support requires APM 0.31.0+ (could not parse 'apm --version')." >&2; exit 1;;
+  esac
+  apm_major="${apm_version%%.*}"; apm_rest="${apm_version#*.}"; apm_minor="${apm_rest%%.*}"
+  if [ "$apm_major" -eq 0 ] && [ "$apm_minor" -lt 31 ]; then
+    echo "spec-driven-workflow: Codex support requires APM 0.31.0+ (found $apm_version)." >&2
+    exit 1
+  fi
+fi
 
 # shellcheck source=/dev/null
 . "$SELF/config-lib.sh"
@@ -46,7 +89,9 @@ mkdir -p "$SW/hooks" "$SW/templates"
 
 # Manual-steps sink: a transient file every part of the installer (incl. the delegated emit-*.sh
 # subprocesses) appends to via notice_add. Rendered into .spec-workflow/MANUAL-STEPS.md at the end.
-SPEC_WORKFLOW_NOTICES="$(mktemp 2>/dev/null || echo "$SW/.install-notices.$$")"; export SPEC_WORKFLOW_NOTICES
+SPEC_WORKFLOW_NOTICES="$(mktemp "$SW/.install-notices.XXXXXX")" || { echo "spec-driven-workflow: secure temporary creation failed." >&2; exit 1; }
+chmod 600 "$SPEC_WORKFLOW_NOTICES"
+export SPEC_WORKFLOW_NOTICES
 : > "$SPEC_WORKFLOW_NOTICES"
 trap 'rm -f "$SPEC_WORKFLOW_NOTICES"' EXIT
 # The SHIPPED check-*.sh set is the single source of truth for which checks exist. pre-commit and
@@ -77,7 +122,7 @@ chmod +x "$SW/hooks/"*.sh "$SW/hooks/pre-commit" 2>/dev/null || true
 
 # MANAGED: MANUAL-STEPS.md is regenerated per environment (it reflects the machine that ran the
 # installer), so keep it out of version control. Written each run so the ignore stays in place.
-printf '%s\n' 'MANUAL-STEPS.md' '.install-notices.*' > "$SW/.gitignore"
+printf '%s\n' 'MANUAL-STEPS.md' 'agent-model-state.json' '.install-notices.*' > "$SW/.gitignore"
 
 # checks.sha256 generated over the DEPLOYED check scripts (post-compile) for the S6 integrity gate.
 # Same glob as the deploy above, so the hashed set is exactly the deployed set.
@@ -91,7 +136,8 @@ seed_if_absent() {   # <src> <dest-rel>
   local src="$1" dest="$ROOT/$2"
   if [ -e "$dest" ]; then skipped+=("$2"); return; fi
   mkdir -p "$(dirname "$dest")"
-  cp "$src" "$dest" && seeded+=("$2")
+  local tmp; tmp=$(mktemp "$(dirname "$dest")/.seed.XXXXXX") || return 1
+  if cp "$src" "$tmp" && mv "$tmp" "$dest"; then seeded+=("$2"); else rm -f "$tmp"; return 1; fi
 }
 
 # AGENTS.md is workflow-managed guidance, not a plain scaffold: seed it whole when absent, and when it
@@ -101,8 +147,9 @@ handle_agents_md() {
   local dest="$ROOT/AGENTS.md"
   local header="$PKG/live-seed/AGENTS.md.stub" snippet="$PKG/live-seed/AGENTS.snippet.md"
   if [ ! -e "$dest" ]; then
-    { sed "s/{{PROJECT_NAME}}/$(basename "$ROOT")/g" "$header"; echo; cat "$snippet"; } > "$dest" \
-      && seeded+=("AGENTS.md")
+    local tmp; tmp=$(mktemp "$ROOT/.AGENTS.md.XXXXXX") || return 1
+    if { sed "s/{{PROJECT_NAME}}/$(basename "$ROOT")/g" "$header"; echo; cat "$snippet"; } > "$tmp" \
+      && mv "$tmp" "$dest"; then seeded+=("AGENTS.md"); else rm -f "$tmp"; return 1; fi
     return
   fi
   # Existing file already carries our section? Leave it entirely alone (keeps `apm update` quiet).
@@ -116,8 +163,10 @@ handle_agents_md() {
     local reply; read -r reply || reply=""
     case "$reply" in
       [yY]|[yY][eE][sS])
-        [ -n "$(tail -c1 "$dest" 2>/dev/null)" ] && printf '\n' >> "$dest"   # ensure a trailing newline first
-        { printf '\n'; cat "$snippet"; } >> "$dest"
+        local tmp; tmp=$(mktemp "$ROOT/.AGENTS.md.XXXXXX") || return 1
+        cp "$dest" "$tmp" || { rm -f "$tmp"; return 1; }
+        [ -n "$(tail -c1 "$tmp" 2>/dev/null)" ] && printf '\n' >> "$tmp"
+        { printf '\n'; cat "$snippet"; } >> "$tmp" && mv "$tmp" "$dest" || { rm -f "$tmp"; return 1; }
         echo "  [agents] appended workflow section to existing AGENTS.md — review it"
         return ;;
     esac
@@ -200,14 +249,16 @@ prompt_hint() {   # <harness>
   case "$1" in
     claude)   echo "opus · sonnet · haiku · inherit · or a full ID like claude-opus-4-8" ;;
     opencode) echo "anthropic/claude-opus-4-8 · ollama/qwen2.5-coder · ollama/devstral" ;;
+    codex)    echo "an exact Codex model ID (empty = inherit the parent/default model)" ;;
     *)        echo "any model string this harness understands" ;;
   esac
 }
-harness_label() { case "$1" in claude) echo "Claude Code";; opencode) echo "opencode";; *) echo "$1";; esac; }
+harness_label() { case "$1" in claude) echo "Claude Code";; opencode) echo "opencode";; codex) echo "Codex CLI";; *) echo "$1";; esac; }
 
 harnesses=""
 [ -d "$ROOT/.claude/agents" ]   && harnesses="$harnesses claude"
 [ -d "$ROOT/.opencode/agents" ] && harnesses="$harnesses opencode"
+[ -d "$ROOT/.codex/agents" ]    && harnesses="$harnesses codex"
 
 if [ "$CONFIG_OK" -eq 1 ] && [ -n "$harnesses" ]; then
   if [ "$INTERACTIVE" -eq 1 ]; then
@@ -270,13 +321,14 @@ bash "$SELF/emit-harness-hooks.sh" "$ROOT" "$SW" || { echo "  [hooks]  per-harne
 
 # --- 8. Render the collected manual steps into a persisted checklist ---
 render_manual_steps() {
-  local out="$SW/MANUAL-STEPS.md"
+  local out="$SW/MANUAL-STEPS.md" tmp
   if [ ! -s "$SPEC_WORKFLOW_NOTICES" ]; then
     { echo "# Spec-Driven Workflow — Manual Steps"; echo; echo "_✓ No outstanding manual steps as of the last install/update._"; } > "$out"
     return
   fi
   # Preserve any items the user already ticked off (best-effort match on the item text against the
   # previous file). Read the sink line by line and emit one checkbox per notice.
+  tmp=$(mktemp "$SW/.manual-steps.XXXXXX") || return 1
   {
     echo "# Spec-Driven Workflow — Manual Steps"
     echo
@@ -292,7 +344,7 @@ render_manual_steps() {
       if [ -f "$out" ] && grep -qxF -e "- [x] $line" "$out" 2>/dev/null; then box="- [x]"; fi
       echo "$box $line"
     done < "$SPEC_WORKFLOW_NOTICES"
-  } > "$out.tmp" && mv "$out.tmp" "$out"
+  } > "$tmp" && mv "$tmp" "$out"
   local n; n=$(grep -c '^- \[' "$out" 2>/dev/null || echo 0)
   echo "  [manual] $n step(s) need your attention — see .spec-workflow/MANUAL-STEPS.md"
 }

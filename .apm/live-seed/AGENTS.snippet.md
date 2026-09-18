@@ -22,4 +22,10 @@ Start a new project with `/requirements <your idea>`; then `/technical-design SP
 the spec's branch (name it whatever your project requires — nothing reads it), `/write-tests`, and
 close out. Status must stay identical in each spec's `spec.md`
 `**Status:**` header and its `specs/INDEX.md` row (the hooks enforce this).
+
+**Codex CLI:** before any repository task, read
+`.agents/skills/spec-driven-workflow/SKILL.md` completely and follow it as project instructions.
+Invoke the workflow entry points as `$requirements`, `$technical-design`, `$write-tests`, and
+`$frontend-architecture`. If that shared skill is absent, stop and ask the user to run
+`apm install --target codex` before proceeding.
 <!-- spec-workflow:end -->

@@ -19,7 +19,13 @@ cfg_log() { printf '  [config] %s\n' "$1"; }
 # Append one manual-step / degraded-outcome notice to the shared sink, if the installer set one up.
 # Cross-process safe: init-and-wire.sh exports SPEC_WORKFLOW_NOTICES so the delegated emit-*.sh
 # scripts (separate processes) can contribute to the same MANUAL-STEPS.md. A no-op when unset.
-notice_add() { [ -n "${SPEC_WORKFLOW_NOTICES:-}" ] && printf '%s\n' "$1" >> "$SPEC_WORKFLOW_NOTICES"; return 0; }
+notice_add() {
+  if [ -n "${SPEC_WORKFLOW_NOTICES:-}" ]; then
+    printf '%s' "$1" | LC_ALL=C tr '\r\n' '  ' | LC_ALL=C tr -d '\000-\010\013\014\016-\037\177' >> "$SPEC_WORKFLOW_NOTICES"
+    printf '\n' >> "$SPEC_WORKFLOW_NOTICES"
+  fi
+  return 0
+}
 
 # --- jq preflight -----------------------------------------------------------
 config_require_jq() {
@@ -117,7 +123,8 @@ config_agent_names() { jq -r '(.agents // {}) | keys[]' "$CONFIG" 2>/dev/null; }
 # All writes funnel through here: jq to a temp file, then move. A jq failure leaves the
 # original untouched rather than truncating it.
 cfg_write() {
-  local tmp="$CONFIG.tmp.$$"
+  local tmp
+  tmp=$(mktemp "$(dirname "$CONFIG")/.config.XXXXXX") || { cfg_log "ERROR: secure temporary creation failed."; return 1; }
   if jq "$@" "$CONFIG" > "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
     mv "$tmp" "$CONFIG"
     return 0
