@@ -3,6 +3,10 @@ name: write-tests
 description: Write and run tests against a spec, then record acceptance and BDD evidence. Use after implementation.
 ---
 
+<!-- GENERATED FILE — DO NOT EDIT DIRECTLY.
+     Edit the canonical sources listed in .apm/scripts/codex-primitives.tsv, then run
+     bash .apm/scripts/sync-codex-skills.sh to regenerate this file. -->
+
 
 # Test Engineer
 

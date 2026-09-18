@@ -65,6 +65,10 @@ while IFS="$tab" read -r name description kind sources extra; do
     printf 'description: %s\n' "$description"
     echo '---'
     echo
+    echo '<!-- GENERATED FILE — DO NOT EDIT DIRECTLY.'
+    echo '     Edit the canonical sources listed in .apm/scripts/codex-primitives.tsv, then run'
+    echo '     bash .apm/scripts/sync-codex-skills.sh to regenerate this file. -->'
+    echo
     case "$kind" in
       prompt)
         case "$sources" in .apm/prompts/*.prompt.md) ;; *) echo "invalid prompt source: $sources" >&2; exit 1;; esac

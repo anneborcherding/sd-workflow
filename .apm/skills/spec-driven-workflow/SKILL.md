@@ -3,6 +3,10 @@ name: spec-driven-workflow
 description: Load the mandatory spec-driven workflow, engineering, testing, security, versioning, and review rules before working in this repository.
 ---
 
+<!-- GENERATED FILE — DO NOT EDIT DIRECTLY.
+     Edit the canonical sources listed in .apm/scripts/codex-primitives.tsv, then run
+     bash .apm/scripts/sync-codex-skills.sh to regenerate this file. -->
+
 <!-- source: .apm/instructions/code-hygiene.instructions.md -->
 
 

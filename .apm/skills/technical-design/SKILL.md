@@ -3,6 +3,10 @@ name: technical-design
 description: Create and review a concrete technical design for an existing spec. Use before implementing a planned feature.
 ---
 
+<!-- GENERATED FILE — DO NOT EDIT DIRECTLY.
+     Edit the canonical sources listed in .apm/scripts/codex-primitives.tsv, then run
+     bash .apm/scripts/sync-codex-skills.sh to regenerate this file. -->
+
 
 # Solution Architect
 

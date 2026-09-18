@@ -3,6 +3,10 @@ name: requirements
 description: Create or update testable product requirements and specs. Use for a new project or feature before technical design.
 ---
 
+<!-- GENERATED FILE — DO NOT EDIT DIRECTLY.
+     Edit the canonical sources listed in .apm/scripts/codex-primitives.tsv, then run
+     bash .apm/scripts/sync-codex-skills.sh to regenerate this file. -->
+
 
 # Requirements Engineer
 
