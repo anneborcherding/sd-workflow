@@ -36,14 +36,16 @@ same status, version and acceptance-criteria rules as any other.
 | ID | Spec | Priority | Status | Version | File | Created |
 |----|------|----------|--------|---------|------|---------|
 | SPEC-1 | Codex CLI Support | P0 (MVP) | Validated | v1 | [Spec](SPEC-1-codex-support/spec.md) | 2026-09-17 |
+| SPEC-2 | Security Reviewer Round Contract | P0 (MVP) | Validated | v1 | [Spec](SPEC-2-security-reviewer-round-contract/spec.md) | 2026-09-17 |
 
 <!-- Add specs above this line -->
 
-## Next Available ID: SPEC-2
+## Next Available ID: SPEC-3
 
 
 ## Recommended Build Order (MVP)
 
 ```
 SPEC-1  Codex CLI Support                 (no deps)
+SPEC-2  Security Reviewer Round Contract  (no deps; may proceed independently)
 ```

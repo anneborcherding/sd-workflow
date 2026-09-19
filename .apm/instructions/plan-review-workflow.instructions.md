@@ -40,6 +40,13 @@ Run both agents in parallel on the original plan:
 
 Do not pass either agent's output to the other in Round 1. Independence is the point.
 
+Label each invocation `Round 1` and provide top-level `Original Plan` and `Relevant Context`
+sections. Do not include either review in the other agent's Round 1 payload. If a parent supplies an
+architecture review to the security reviewer in Round 1, that reviewer must treat the input as
+contaminated and non-certifying, then request a clean rerun. If the round label is absent, Round 1
+may be inferred only from those two top-level sections with no Round 2 sections; every other
+unlabelled shape is ambiguous and must be rerun with a label.
+
 ---
 
 ## Refinement — Revise the Plan
@@ -68,6 +75,11 @@ Run both agents again on the Revised Plan, with full context from Round 1:
 - **Task D — Security Review (Round 2)** — input: revised plan + change log + Round 1 security review
   + Round 1 architecture review. Focus: do the architecture-driven changes introduce security
   problems? Are Round 1 security concerns resolved?
+
+Label both invocations `Round 2` and provide top-level `Revised Plan`, `Change Log`, `Round 1
+Security Review`, and `Round 1 Architecture Review` sections. If either Round 1 review is missing,
+the security reviewer must treat the Round 2 input as incomplete and non-certifying: it must not
+issue a certifying verdict or claim cross-discipline findings are resolved.
 
 ---
 

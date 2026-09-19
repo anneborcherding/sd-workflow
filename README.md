@@ -47,6 +47,9 @@ showing the status header, changelog, ticked acceptance criteria, a descoped one
 - **Reviewer agents** — `architecture-reviewer`, `security-reviewer`, driving the Plan Review Workflow.
   Pick a model per agent (any model your harness understands, including local ones) — see
   *Choosing models for the reviewer agents*.
+- **Review-round contract** — in Round 1, architecture and security review the original plan
+  independently with relevant context only; in Round 2, both review the revised plan, change log,
+  and both Round 1 reviews. The same shared reviewer sources are compiled for every supported harness.
 - **Security rules** — auto-injected when you touch `.env*` or `**/api/**`, from wherever your context
   map points (`kind=security`; defaults to `docs/SECURITY-RULES.md`).
 - **General engineering rules** — `engineering-practices` (discovery before assumption, KISS/DRY/YAGNI,
@@ -275,6 +278,7 @@ fixtures in a temp dir — nothing is installed and your repo is untouched:
 ```bash
 bash tests/enforcement.test.sh     # exit 0 = all passed
 bash tests/codex-support.test.sh   # Codex packaging, preservation, model, and APM integration
+bash tests/security-reviewer-contract.test.sh  # reviewer round contract across all APM targets
 ```
 
 It covers the status / AC / open-question state machine, the spec-versioning substantive-change rules

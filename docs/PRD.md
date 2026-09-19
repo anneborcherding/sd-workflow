@@ -23,6 +23,7 @@ coding-agent harnesses without surrendering their existing project data or confi
 | Priority | ID | Spec | File |
 |----------|----|------|------|
 | P0 (MVP) | SPEC-1 | Codex CLI Support | [Spec](../specs/SPEC-1-codex-support/spec.md) |
+| P0 (MVP) | SPEC-2 | Security Reviewer Round Contract | [Spec](../specs/SPEC-2-security-reviewer-round-contract/spec.md) |
 
 ## Success Metrics
 - APM installs every workflow primitive into locations recognized by each supported harness.
